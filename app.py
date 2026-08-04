@@ -167,6 +167,24 @@ def chat(request: ChatRequest):
         print(f"Error during inference: {e}")
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
+# Gradio Interface for Hugging Face Spaces (Free Gradio SDK)
+import gradio as gr
+
+def predict(message, history):
+    req = ChatRequest(question=message)
+    resp = chat(req)
+    return resp["answer"]
+
+demo = gr.ChatInterface(
+    fn=predict,
+    title="MediPulse AI - Medical Q&A Assistant",
+    description="Fine-tuned Llama 3.2 1B Medical Chatbot (dharaamehta33/medical-chatbot-llama)",
+    examples=[
+        "What are common symptoms of seasonal allergies?",
+        "What causes a fever?",
+        "What is an MRI scan used for?"
+    ]
+)
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=7860, reload=False)
+    demo.launch(server_name="0.0.0.0", server_port=7860)
