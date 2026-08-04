@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
             base_model_id,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto" if torch.cuda.is_available() else None,
+            low_cpu_mem_usage=True,
             token=hf_token
         )
         print(f"Applying PEFT adapter from {MODEL_ID}...")
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
             MODEL_ID,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto" if torch.cuda.is_available() else None,
+            low_cpu_mem_usage=True,
             token=hf_token
         )
 
