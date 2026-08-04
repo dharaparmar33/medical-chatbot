@@ -389,10 +389,16 @@
             </div>
         </header>
 
-        <div class="config-bar">
-            <label for="api-url">Backend API Endpoint:</label>
-            <input type="text" id="api-url" placeholder="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama"
-                value="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama">
+        <div class="config-bar" style="display: flex; flex-wrap: wrap; gap: 12px; padding: 0.75rem 1.5rem; background: rgba(15, 23, 42, 0.3); border-bottom: 1px solid var(--border-color);">
+            <div style="flex: 2; min-width: 260px;">
+                <label for="api-url" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Backend Endpoint:</label>
+                <input type="text" id="api-url" placeholder="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama"
+                    value="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama" style="width: 100%; padding: 0.5rem 0.75rem; background: var(--user-bubble); border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 0.85rem;">
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <label for="hf-token" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">HF Access Token (hf_...):</label>
+                <input type="password" id="hf-token" placeholder="Paste your hf_... token here" autocomplete="off" style="width: 100%; padding: 0.5rem 0.75rem; background: var(--user-bubble); border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 0.85rem;">
+            </div>
         </div>
 
         <div class="disclaimer-banner">
@@ -435,6 +441,18 @@
         const sendBtn = document.getElementById('send-btn');
         const chatMessages = document.getElementById('chat-messages');
         const apiUrlInput = document.getElementById('api-url');
+        const hfTokenInput = document.getElementById('hf-token');
+
+        // Load saved token from localStorage if available
+        if (localStorage.getItem('hf_token_saved')) {
+            hfTokenInput.value = localStorage.getItem('hf_token_saved');
+        }
+
+        hfTokenInput.addEventListener('change', () => {
+            if (hfTokenInput.value.trim()) {
+                localStorage.setItem('hf_token_saved', hfTokenInput.value.trim());
+            }
+        });
 
         // Auto-detect backend protocol for live site
         if (window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -443,7 +461,7 @@
             if (customApi) {
                 apiUrlInput.value = customApi;
             } else if (!apiUrlInput.value || apiUrlInput.value.includes('localhost')) {
-                apiUrlInput.value = 'https://medical-chatbot-api-uj8z.onrender.com';
+                apiUrlInput.value = 'https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama';
             }
         }
 
@@ -542,11 +560,18 @@
 
                 if (baseUrl.includes("huggingface.co")) {
                     const prompt = `Below is an instruction with input. Write a helpful response.\n### Instruction:\nYou are a helpful medical assistant. Answer clearly and safely.\n### Input:\n${question}\n### Response:\n`;
+                    
+                    const headers = {
+                        'Content-Type': 'application/json',
+                    };
+                    const hfToken = hfTokenInput.value.trim();
+                    if (hfToken) {
+                        headers['Authorization'] = `Bearer ${hfToken}`;
+                    }
+
                     const response = await fetch(baseUrl, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: headers,
                         body: JSON.stringify({
                             inputs: prompt,
                             parameters: {
