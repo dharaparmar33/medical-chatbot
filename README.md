@@ -1,14 +1,12 @@
 ---
-title: Medical QA Chatbot
+title: MediPulse AI - Medical Q&A Assistant
 emoji: 🩺
 colorFrom: blue
 colorTo: green
-sdk: gradio
-sdk_version: 4.26.0
-app_file: app.py
+sdk: static
 pinned: false
 ---
 
-# Medical Q&A Chatbot API & Web UI
+# MediPulse AI - Medical Q&A Assistant
 
-A fine-tuned Llama 3.2 1B Medical Q&A Chatbot powered by Gradio, FastAPI and PEFT (`dharaamehta33/medical-chatbot-llama`).
+A fine-tuned Llama 3.2 1B Medical Q&A Chatbot web app (`dharaamehta33/medical-chatbot-llama`).
