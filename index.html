@@ -436,6 +436,15 @@
         const chatMessages = document.getElementById('chat-messages');
         const apiUrlInput = document.getElementById('api-url');
 
+        // Auto-detect if running on HTTPS website (e.g. Hugging Face Spaces)
+        if (window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const customApi = urlParams.get('api');
+            if (customApi) {
+                apiUrlInput.value = customApi;
+            }
+        }
+
         function appendMessage(role, text) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
