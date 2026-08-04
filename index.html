@@ -392,8 +392,8 @@
         <div class="config-bar" style="display: flex; flex-wrap: wrap; gap: 12px; padding: 0.75rem 1.5rem; background: rgba(15, 23, 42, 0.3); border-bottom: 1px solid var(--border-color);">
             <div style="flex: 2; min-width: 260px;">
                 <label for="api-url" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Backend Endpoint:</label>
-                <input type="text" id="api-url" placeholder="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama"
-                    value="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama" style="width: 100%; padding: 0.5rem 0.75rem; background: var(--user-bubble); border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 0.85rem;">
+                <input type="text" id="api-url" placeholder="https://router.huggingface.co/hf-inference/models/dharaamehta33/medical-chatbot-llama"
+                    value="https://router.huggingface.co/hf-inference/models/dharaamehta33/medical-chatbot-llama" style="width: 100%; padding: 0.5rem 0.75rem; background: var(--user-bubble); border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 0.85rem;">
             </div>
             <div style="flex: 1; min-width: 200px;">
                 <label for="hf-token" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">HF Access Token (hf_...):</label>
@@ -461,7 +461,7 @@
             if (customApi) {
                 apiUrlInput.value = customApi;
             } else if (!apiUrlInput.value || apiUrlInput.value.includes('localhost')) {
-                apiUrlInput.value = 'https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama';
+                apiUrlInput.value = 'https://router.huggingface.co/hf-inference/models/dharaamehta33/medical-chatbot-llama';
             }
         }
 
@@ -544,7 +544,7 @@
 
             let baseUrl = apiUrlInput.value.trim();
             if (!baseUrl) {
-                baseUrl = 'https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama';
+                baseUrl = 'https://router.huggingface.co/hf-inference/models/dharaamehta33/medical-chatbot-llama';
             }
 
             // Clean up URL formatting
