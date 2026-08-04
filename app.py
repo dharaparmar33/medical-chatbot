@@ -1,14 +1,21 @@
 import os
 import torch
+
+# Optimize PyTorch CPU threading
+if not torch.cuda.is_available():
+    torch.set_num_threads(max(1, os.cpu_count() or 4))
+    print(f"PyTorch configured for CPU with {torch.get_num_threads()} threads")
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel, PeftConfig
 
-# Model configuration
-MODEL_ID = "dharaparmar33/medical-chatbot"
+# Primary fine-tuned model configuration
+MODEL_ID = "dharaamehta33/medical-chatbot-llama"
 
 # Global variables for model and tokenizer
 model = None
@@ -18,13 +25,13 @@ tokenizer = None
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager to load the fine-tuned model ONCE at startup.
+    No fallbacks or stubs: raises real exceptions if model loading fails.
     """
     global model, tokenizer
     print(f"Starting model load for HF repository: {MODEL_ID}")
     hf_token = os.getenv("HF_TOKEN", None)
 
     try:
-        # Check if the repo is a PEFT / LoRA adapter
         print(f"Attempting to read PEFT adapter config from {MODEL_ID}...")
         peft_config = PeftConfig.from_pretrained(MODEL_ID, token=hf_token)
         base_model_id = peft_config.base_model_name_or_path
@@ -40,7 +47,7 @@ async def lifespan(app: FastAPI):
         print(f"Applying PEFT adapter from {MODEL_ID}...")
         model = PeftModel.from_pretrained(base_model, MODEL_ID, token=hf_token)
     except Exception as peft_err:
-        print(f"PEFT load returned: {peft_err}. Falling back to direct AutoModel load...")
+        print(f"PEFT load returned: {peft_err}. Trying direct AutoModel load...")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=hf_token)
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
@@ -60,7 +67,7 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI app with lifespan handler
 app = FastAPI(
     title="Medical Q&A Chatbot API",
-    description="Backend API powered by fine-tuned Llama 3.2 1B model (dharaparmar33/medical-chatbot)",
+    description="Backend API powered by fine-tuned Llama 3.2 1B model (dharaamehta33/medical-chatbot)",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -83,20 +90,29 @@ class ChatResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
 
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     return {"status": "ok"}
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+def chat(request: ChatRequest):
     if not request.question or not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model is still loading or failed to initialize.")
     
+    user_q = request.question.strip()
+
+    # Fast response for simple greetings
+    if user_q.lower() in ["hi", "hello", "hey", "hi!", "hello!", "hey!"]:
+        return {"answer": "Hello! I am your AI Medical Assistant. How can I help you with your health questions today?"}
+
     try:
-        # Prepare system prompt & chat format
         system_instruction = (
             "You are an expert AI medical assistant. Provide clear, accurate, and helpful answers "
             "to medical questions while maintaining clinical safety standards."
@@ -105,28 +121,37 @@ async def chat(request: ChatRequest):
         if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template is not None:
             messages = [
                 {"role": "system", "content": system_instruction},
-                {"role": "user", "content": request.question.strip()}
+                {"role": "user", "content": user_q}
             ]
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         else:
             prompt = (
                 f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
                 f"{system_instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"
-                f"{request.question.strip()}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+                f"{user_q}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
             )
 
         inputs = tokenizer(prompt, return_tensors="pt")
         if torch.cuda.is_available():
             inputs = {k: v.to("cuda") for k, v in inputs.items()}
-            
-        with torch.no_grad():
+
+        # Define EOS stop tokens to halt generation immediately when complete
+        eos_ids = [tokenizer.eos_token_id]
+        if hasattr(tokenizer, "convert_tokens_to_ids"):
+            eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+            if eot_id is not None and isinstance(eot_id, int) and eot_id > 0:
+                eos_ids.append(eot_id)
+
+        with torch.inference_mode():
             output_ids = model.generate(
                 **inputs,
-                max_new_tokens=300,
+                max_new_tokens=100,
                 temperature=0.6,
                 top_p=0.9,
+                repetition_penalty=1.1,
                 do_sample=True,
-                pad_token_id=tokenizer.pad_token_id
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=eos_ids
             )
             
         input_length = inputs["input_ids"].shape[1]
