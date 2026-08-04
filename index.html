@@ -391,8 +391,8 @@
 
         <div class="config-bar">
             <label for="api-url">Backend API Endpoint:</label>
-            <input type="text" id="api-url" placeholder="https://medical-chatbot-api-uj8z.onrender.com"
-                value="https://medical-chatbot-api-uj8z.onrender.com">
+            <input type="text" id="api-url" placeholder="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama"
+                value="https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama">
         </div>
 
         <div class="disclaimer-banner">
@@ -515,15 +515,22 @@
             const question = userInput.value.trim();
             if (!question) return;
 
+            // Handle simple greetings locally for zero latency
+            const qLower = question.toLowerCase();
+            if (['hi', 'hello', 'hey', 'hi!', 'hello!', 'hey!'].includes(qLower)) {
+                appendMessage('user', question);
+                userInput.value = '';
+                appendMessage('assistant', 'Hello! I am your AI Medical Assistant. How can I help you with your health questions today?');
+                return;
+            }
+
             let baseUrl = apiUrlInput.value.trim();
             if (!baseUrl) {
-                alert('Please specify a valid backend API URL.');
-                return;
+                baseUrl = 'https://api-inference.huggingface.co/models/dharaamehta33/medical-chatbot-llama';
             }
 
             // Clean up URL formatting
             baseUrl = baseUrl.replace(/\/+$/, '');
-            const chatEndpoint = baseUrl.endsWith('/chat') ? baseUrl : `${baseUrl}/chat`;
 
             appendMessage('user', question);
             userInput.value = '';
@@ -531,27 +538,71 @@
             showTypingIndicator();
 
             try {
-                const response = await fetch(chatEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ question: question }),
-                });
+                let answer = "";
 
-                removeTypingIndicator();
+                if (baseUrl.includes("huggingface.co")) {
+                    const prompt = `Below is an instruction with input. Write a helpful response.\n### Instruction:\nYou are a helpful medical assistant. Answer clearly and safely.\n### Input:\n${question}\n### Response:\n`;
+                    const response = await fetch(baseUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            inputs: prompt,
+                            parameters: {
+                                max_new_tokens: 120,
+                                temperature: 0.6,
+                                return_full_text: false
+                            }
+                        }),
+                    });
 
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail || `Server error (${response.status})`);
+                    removeTypingIndicator();
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || errData.detail || `Hugging Face API status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (Array.isArray(data) && data[0]) {
+                        answer = data[0].generated_text || data[0].summary_text || "";
+                    } else if (data.generated_text) {
+                        answer = data.generated_text;
+                    } else if (typeof data === "string") {
+                        answer = data;
+                    }
+
+                    if (!answer) {
+                        answer = "Thank you for your question. Please consult a qualified healthcare professional for personalized medical guidance.";
+                    }
+
+                } else {
+                    const chatEndpoint = baseUrl.endsWith('/chat') ? baseUrl : `${baseUrl}/chat`;
+                    const response = await fetch(chatEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ question: question }),
+                    });
+
+                    removeTypingIndicator();
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.detail || `Server error (${response.status})`);
+                    }
+
+                    const data = await response.json();
+                    answer = data.answer || 'No response received.';
                 }
 
-                const data = await response.json();
-                appendMessage('assistant', data.answer || 'No response received.');
+                appendMessage('assistant', answer);
 
             } catch (error) {
                 removeTypingIndicator();
-                appendMessage('assistant', `⚠️ Error connecting to server: ${error.message}. Please check if the backend API URL is running and accessible.`);
+                appendMessage('assistant', `⚠️ ${error.message}. If the model is loading on Hugging Face servers, please wait 20 seconds and try again!`);
             } finally {
                 sendBtn.disabled = false;
                 userInput.focus();
